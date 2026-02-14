@@ -19,6 +19,7 @@ pub struct PlotData {
     pub points: Vec<(f64, f64)>,
     pub color: String,
     pub label: String,
+    pub timestamp: i64, // ДОБАВИЛИ
 }
 
 pub fn compile_and_run(code: String) -> CompilationResult {
