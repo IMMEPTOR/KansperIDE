@@ -1,6 +1,7 @@
 use crate::compiler::ast::*;
 use crate::compiler::PlotData;
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH}; // Вынес импорт времени наверх
 
 pub type OutputHandler = Box<dyn FnMut(String) + Send>;
 pub type PlotHandler = Box<dyn FnMut(PlotData) + Send>;
@@ -153,150 +154,214 @@ impl Interpreter {
                 }
             }
             Expr::ВызовФункции { имя, аргументы } => {
-    // Встроенная функция печать
-    if имя == "печать" {
-        let mut output_parts = Vec::new();
-        for arg in аргументы {
-            let val = self.evaluate_expression(arg)?;
-            output_parts.push(format_value(&val));
-        }
-        self.print(output_parts.join(" "));
-        return Ok(Value::Пусто);
-    }
-    
-    // Встроенная функция график
-    // Встроенная функция график
-if имя == "график" {
-    if аргументы.len() < 3 {
-        return Err("график требует: функция, от, до".to_string());
-    }
-    
-    let func_name = match &аргументы[0] {
-        Expr::Идентификатор(name) => name.clone(),
-        _ => return Err("Первый аргумент должен быть функцией".to_string()),
-    };
-    
-    let from = match self.evaluate_expression(&аргументы[1])? {
-        Value::Число(n) => n,
-        _ => return Err("Второй аргумент должен быть числом".to_string()),
-    };
-    
-    let to = match self.evaluate_expression(&аргументы[2])? {
-        Value::Число(n) => n,
-        _ => return Err("Третий аргумент должен быть числом".to_string()),
-    };
-    
-    // Получить функцию
-    let (params, body) = self.functions.get(&func_name).cloned()
-        .ok_or_else(|| format!("Функция '{}' не найдена", func_name))?;
-    
-    if params.len() != 1 {
-        return Err(format!("Функция для графика должна иметь 1 параметр, получено {}", params.len()));
-    }
-    
-    let param_name = params[0].clone();
-    
-    // Сохранить глобальные переменные
-    let saved_globals = self.variables.clone();
-    
-    // Вычислить точки
-    let steps = 200;
-    let step = (to - from) / steps as f64;
-    let mut points = Vec::new();
-    
-    for i in 0..=steps {
-        let x = from + i as f64 * step;
-        
-        // КРИТИЧЕСКИ ВАЖНО: создать НОВУЮ чистую область видимости
-        self.variables.clear();
-        self.variables.insert(param_name.clone(), Value::Число(x));
-        
-        // Выполнить функцию
-        let mut result = Value::Пусто;
-        for stmt in &body {
-            if let Some(ret) = self.execute_statement(stmt)? {
-                result = ret;
-                break;
-            }
-        }
-        
-        if let Value::Число(y) = result {
-            if y.is_finite() {
-                points.push((x, y));
+                // --- 1. Встроенная функция ПЕЧАТЬ ---
+                if имя == "печать" {
+                    let mut output_parts = Vec::new();
+                    for arg in аргументы {
+                        let val = self.evaluate_expression(arg)?;
+                        output_parts.push(format_value(&val));
+                    }
+                    self.print(output_parts.join(" "));
+                    return Ok(Value::Пусто);
+                }
                 
-                // Отладка первых нескольких точек
-                if i < 3 || i == steps {
-                    eprintln!("Point {}: x={}, y={}", i, x, y);
+                // --- 2. Встроенная функция ГРАФИК ---
+                if имя == "график" {
+                    if аргументы.len() < 3 {
+                        return Err("график требует: функция, от, до".to_string());
+                    }
+                    
+                    let func_name = match &аргументы[0] {
+                        Expr::Идентификатор(name) => name.clone(),
+                        _ => return Err("Первый аргумент должен быть именем функции".to_string()),
+                    };
+                    
+                    let from = match self.evaluate_expression(&аргументы[1])? {
+                        Value::Число(n) => n,
+                        _ => return Err("Второй аргумент должен быть числом".to_string()),
+                    };
+                    
+                    let to = match self.evaluate_expression(&аргументы[2])? {
+                        Value::Число(n) => n,
+                        _ => return Err("Третий аргумент должен быть числом".to_string()),
+                    };
+                    
+                    // Получить функцию
+                    let (params, body) = self.functions.get(&func_name).cloned()
+                        .ok_or_else(|| format!("Функция '{}' не найдена", func_name))?;
+                    
+                    if params.len() != 1 {
+                        return Err(format!("Функция для графика должна иметь 1 параметр, получено {}", params.len()));
+                    }
+                    
+                    let param_name = params[0].clone();
+                    
+                    // Сохранить глобальные переменные
+                    let saved_globals = self.variables.clone();
+                    
+                    // Вычислить точки
+                    let steps = 200;
+                    let step = (to - from) / steps as f64;
+                    let mut points = Vec::new();
+                    
+                    for i in 0..=steps {
+                        let x = from + i as f64 * step;
+                        
+                        // Создать чистую область видимости для вычисления точки
+                        self.variables.clear();
+                        self.variables.insert(param_name.clone(), Value::Число(x));
+                        
+                        // Выполнить функцию
+                        let mut result = Value::Пусто;
+                        for stmt in &body {
+                            if let Some(ret) = self.execute_statement(stmt)? {
+                                result = ret;
+                                break;
+                            }
+                        }
+                        
+                        if let Value::Число(y) = result {
+                            if y.is_finite() {
+                                points.push((x, y));
+                            }
+                        }
+                    }
+                    
+                    // Восстановить глобальные переменные
+                    self.variables = saved_globals;
+                    
+                    // Отправить график
+                    if let Some(ref mut handler) = self.plot_handler {
+                        let timestamp = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis() as i64;
+                        
+                        handler(PlotData {
+                            points,
+                            color: "#0066cc".to_string(),
+                            label: func_name,
+                            timestamp,
+                        });
+                    }
+                    
+                    return Ok(Value::Пусто);
+                }
+
+                // --- 3. ВЫЧИСЛЕНИЕ АРГУМЕНТОВ (для математики и пользовательских функций) ---
+                let mut arg_values = Vec::new();
+                for arg in аргументы {
+                    arg_values.push(self.evaluate_expression(arg)?);
+                }
+
+                // --- 4. МАТЕМАТИЧЕСКИЕ И ПОЛЬЗОВАТЕЛЬСКИЕ ФУНКЦИИ ---
+                match имя.as_str() {
+                    "син" => {
+                        if arg_values.len() != 1 {
+                            return Err("син ожидает 1 аргумент".to_string());
+                        }
+                        if let Value::Число(x) = arg_values[0] {
+                            Ok(Value::Число(x.sin()))
+                        } else {
+                            Err("Аргумент син должен быть числом".to_string())
+                        }
+                    }
+                    "кос" => {
+                        if arg_values.len() != 1 {
+                            return Err("кос ожидает 1 аргумент".to_string());
+                        }
+                        if let Value::Число(x) = arg_values[0] {
+                            Ok(Value::Число(x.cos()))
+                        } else {
+                            Err("Аргумент кос должен быть числом".to_string())
+                        }
+                    }
+                    "эксп" => {
+                        if arg_values.len() != 1 {
+                            return Err("эксп ожидает 1 аргумент".to_string());
+                        }
+                        if let Value::Число(x) = arg_values[0] {
+                            Ok(Value::Число(x.exp()))
+                        } else {
+                            Err("Аргумент эксп должен быть числом".to_string())
+                        }
+                    }
+                    "лог" => {
+                        if arg_values.len() != 1 {
+                            return Err("лог ожидает 1 аргумент".to_string());
+                        }
+                        if let Value::Число(x) = arg_values[0] {
+                            if x <= 0.0 {
+                                Err("Аргумент лог должен быть >0".to_string())
+                            } else {
+                                Ok(Value::Число(x.ln()))
+                            }
+                        } else {
+                            Err("Аргумент лог должен быть числом".to_string())
+                        }
+                    }
+                    "корень" => {
+                        if arg_values.len() != 1 {
+                            return Err("корень ожидает 1 аргумент".to_string());
+                        }
+                        if let Value::Число(x) = arg_values[0] {
+                            if x < 0.0 {
+                                Err("Аргумент корень должен быть >=0".to_string())
+                            } else {
+                                Ok(Value::Число(x.sqrt()))
+                            }
+                        } else {
+                            Err("Аргумент корень должен быть числом".to_string())
+                        }
+                    }
+                    // Пользовательские функции
+                    _ => {
+                        if let Some((params, body)) = self.functions.get(имя).cloned() {
+                            if params.len() != arg_values.len() {
+                                return Err(format!(
+                                    "Функция '{}' ожидает {} аргументов, получено {}",
+                                    имя, params.len(), arg_values.len()
+                                ));
+                            }
+                            
+                            // Сохранить текущие переменные (изоляция scope, как в оригинале)
+                            let old_vars = self.variables.clone();
+                            
+                            // Установить параметры
+                            // Очищаем переменные, чтобы эмулировать локальную область видимости (если такова задумка)
+                            // Если вы хотите доступ к глобальным переменным внутри функции, 
+                            // уберите self.variables.clear() и просто вставьте параметры.
+                            // Но судя по коду графика, вы используете изоляцию.
+                            
+                            // Вариант 1: Полная изоляция (только параметры доступны)
+                             self.variables.clear(); 
+                            
+                            // Вариант 2 (обычный): Новая область видимости + доступ к глобальным (раскомментировать при желании)
+                            // self.variables = old_vars.clone(); 
+                            
+                            for (param, val) in params.iter().zip(arg_values.iter()) {
+                                self.variables.insert(param.clone(), val.clone());
+                            }
+                            
+                            // Выполнить функцию
+                            let mut result = Value::Пусто;
+                            for stmt in &body {
+                                if let Some(ret) = self.execute_statement(stmt)? {
+                                    result = ret;
+                                    break;
+                                }
+                            }
+                            
+                            // Восстановить переменные
+                            self.variables = old_vars;
+                            
+                            Ok(result)
+                        } else {
+                            Err(format!("Функция '{}' не найдена", имя))
+                        }
+                    }
                 }
             }
-        }
-    }
-    
-    // Восстановить глобальные переменные
-    self.variables = saved_globals;
-    
-    eprintln!("Generated {} points for {}", points.len(), func_name);
-    
-    // Отправить график
-    if let Some(ref mut handler) = self.plot_handler {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
-        
-        handler(PlotData {
-            points,
-            color: "#0066cc".to_string(),
-            label: func_name,
-            timestamp, // ДОБАВИЛИ
-        });
-    }
-    
-    return Ok(Value::Пусто);
-    
-    return Ok(Value::Пусто);
-}
-    
-    // Пользовательские функции
-    if let Some((params, body)) = self.functions.get(имя).cloned() {
-        let mut arg_values = Vec::new();
-        for arg in аргументы {
-            arg_values.push(self.evaluate_expression(arg)?);
-        }
-        
-        if params.len() != arg_values.len() {
-            return Err(format!(
-                "Функция '{}' ожидает {} аргументов, получено {}",
-                имя, params.len(), arg_values.len()
-            ));
-        }
-        
-        // Сохранить текущие переменные
-        let old_vars = self.variables.clone();
-        
-        // Установить параметры
-        for (param, val) in params.iter().zip(arg_values.iter()) {
-            self.variables.insert(param.clone(), val.clone());
-        }
-        
-        // Выполнить функцию
-        let mut result = Value::Пусто;
-        for stmt in &body {
-            if let Some(ret) = self.execute_statement(stmt)? {
-                result = ret;
-                break;
-            }
-        }
-        
-        // Восстановить переменные
-        self.variables = old_vars;
-        
-        Ok(result)
-    } else {
-        Err(format!("Функция '{}' не найдена", имя))
-    }
-}
             Expr::Присваивание { имя, значение } => {
                 let val = self.evaluate_expression(значение)?;
                 self.variables.insert(имя.clone(), val.clone());

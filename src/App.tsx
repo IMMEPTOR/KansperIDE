@@ -52,11 +52,13 @@ function App() {
   } = useRusCompiler();
 
   const handleRun = async () => {
-  console.log('🚀 Running code...');
+  console.log('Running code...');
+  setPlots([]);  // Добавь эту строку для принудительной очистки перед запуском
+  
   const result = await runCode(code);
   
   if (result?.plots) {
-    console.log('📊 NEW plots received:', {
+    console.log('NEW plots received:', {
       count: result.plots.length,
       timestamps: result.plots.map((p: any) => p.timestamp),
       firstPlot: result.plots[0]
@@ -65,7 +67,7 @@ function App() {
     // Создать НОВЫЙ массив для принудительного обновления React
     setPlots([...result.plots]);
   } else {
-    console.log('❌ No plots');
+    console.log('No plots');
     setPlots([]);
   }
 };
@@ -174,7 +176,9 @@ function App() {
             />
           </div>
           
-          <GraphCanvas plots={plots} key={JSON.stringify(plots)} />
+          <div className="graph-container">
+            <GraphCanvas plots={plots} key={JSON.stringify(plots)} />
+          </div>
         </div>
       </div>
     </div>

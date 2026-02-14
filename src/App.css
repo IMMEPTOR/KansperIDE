@@ -128,3 +128,15 @@ button {
   max-height: 50%;
   overflow: hidden;
 }
+
+.graph-container {
+  width: 100%;  /* или fixed, напр. 50vw для правой панели */
+  height: 400px;  /* фиксированная высота, или 100% */
+  overflow: hidden;  /* скрывает overflow */
+  border: 1px solid #ccc;  /* для видимости */
+  position: relative;
+}
+.graph-container canvas {
+  width: 100%;
+  height: 100%;
+}
