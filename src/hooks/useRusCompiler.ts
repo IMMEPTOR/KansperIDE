@@ -1,72 +1,126 @@
 import { invoke } from '@tauri-apps/api/core';
+import { open, save } from '@tauri-apps/plugin-dialog';
 import { useState, useCallback } from 'react';
 
 interface CompilationResult {
   success: boolean;
   output: string;
   errors: string[];
+  plots?: PlotData[];
+}
+
+interface PlotData {
+  points: [number, number][];
+  color: string;
+  label: string;
 }
 
 export function useRusCompiler() {
   const [isRunning, setIsRunning] = useState(false);
   const [output, setOutput] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
+  const [plots, setPlots] = useState<PlotData[]>([]);
+  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
 
   const runCode = useCallback(async (code: string) => {
     setIsRunning(true);
     setOutput('');
     setErrors([]);
+    setPlots([]);
 
-    // Даём Tauri чуть времени на инициализацию (Tauri v2 иногда медленный)
-    // Даём Tauri 1 секунду на инициализацию
-    await new Promise(r => setTimeout(r, 1000));
-
-    console.log('__TAURI_INTERNALS__ после ожидания:', !!window.__TAURI_INTERNALS__);
-    console.log('__TAURI__ после ожидания:', !!window.__TAURI__);
-
-    if (!window.__TAURI_INTERNALS__ && !window.__TAURI__) {
-    setErrors(['Tauri API всё ещё не готов...']);
-    setIsRunning(false);
-    return null;
-    }
     try {
       const result = await invoke<CompilationResult>('run_code', { code });
-      setOutput(result.output || '');
-      setErrors(result.errors || []);
-
-      if (!result.success) {
-        console.warn('Выполнение завершилось с ошибками:', result.errors);
+      
+      setOutput(result.output);
+      setErrors(result.errors);
+      
+      if (result.plots) {
+        setPlots(result.plots);
       }
-
+      
       return result;
-    } catch (error: any) {
-      const errorMsg = error?.message || String(error);
-      setErrors([`Ошибка связи с Rust: ${errorMsg}`]);
-      console.error('invoke error:', error);
+    } catch (error) {
+      setErrors([`Ошибка: ${error}`]);
       return null;
     } finally {
       setIsRunning(false);
     }
   }, []);
 
-  const saveFile = useCallback(async (path: string, content: string) => {
+  const saveFile = useCallback(async (content: string, path?: string) => {
     try {
-      await invoke('save_file', { path, content });
-      return true;
+      let filePath = path || currentFilePath;
+      
+      if (!filePath) {
+        // Открыть диалог сохранения
+        filePath = await save({
+          filters: [{
+            name: 'Рус',
+            extensions: ['рус', 'rus']
+          }],
+          defaultPath: 'program.рус'
+        });
+        
+        if (!filePath) {
+          return { success: false, message: 'Отменено' };
+        }
+      }
+      
+      await invoke('save_file', { path: filePath, content });
+      setCurrentFilePath(filePath);
+      
+      return { success: true, path: filePath };
     } catch (error) {
-      console.error('save_file error:', error);
-      return false;
+      console.error('Ошибка сохранения:', error);
+      return { success: false, message: String(error) };
     }
-  }, []);
+  }, [currentFilePath]);
 
-  const loadFile = useCallback(async (path: string) => {
+  const saveFileAs = useCallback(async (content: string) => {
+    return await saveFile(content, undefined);
+  }, [saveFile]);
+
+  const openFile = useCallback(async () => {
     try {
-      return await invoke<string>('load_file', { path });
+      const selected = await open({
+        filters: [{
+          name: 'Рус',
+          extensions: ['рус', 'rus']
+        }],
+        multiple: false
+      });
+      
+      if (!selected) {
+        return null;
+      }
+      
+      const filePath = selected;
+      const content = await invoke<string>('load_file', { path: filePath });
+      
+      setCurrentFilePath(filePath);
+      
+      return { content, path: filePath };
     } catch (error) {
-      console.error('load_file error:', error);
+      console.error('Ошибка открытия:', error);
       return null;
     }
   }, []);
 
-  return { runCode, saveFile, loadFile, isRunning, output, errors };
+  const newFile = useCallback(() => {
+    setCurrentFilePath(null);
+    setPlots([]);
+  }, []);
+
+  return {
+    runCode,
+    saveFile,
+    saveFileAs,
+    openFile,
+    newFile,
+    isRunning,
+    output,
+    errors,
+    plots,
+    currentFilePath,
+  };
 }

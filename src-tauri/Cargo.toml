@@ -1,24 +1,25 @@
 [package]
 name = "rus-ide"
-version = "0.1.0"
+version = "1.0.0"
 description = "IDE для языка программирования Рус"
-authors = ["yroslav"]
+authors = ["Yroslav"]
 edition = "2021"
 
 [lib]
 name = "rus_ide_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-[dependencies]
-tauri = { version = "2.10", features = [] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tauri-plugin-log = "2"
-log = "0.4"
-
 [build-dependencies]
-tauri-build = { version = "2.5", features = [] }
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [features]
-default = []
+default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

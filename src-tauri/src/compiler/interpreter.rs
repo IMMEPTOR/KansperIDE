@@ -1,8 +1,9 @@
 use crate::compiler::ast::*;
+use crate::compiler::PlotData;
 use std::collections::HashMap;
 
-// Тип обработчика вывода — замыкание, которое принимает String
 pub type OutputHandler = Box<dyn FnMut(String) + Send>;
+pub type PlotHandler = Box<dyn FnMut(PlotData) + Send>;
 
 #[derive(Debug, Clone)]
 pub enum Value {
@@ -17,9 +18,10 @@ pub enum Value {
 }
 
 pub struct Interpreter {
-    pub variables: HashMap<String, Value>,
-    pub functions: HashMap<String, (Vec<String>, Vec<Stmt>)>,
-    pub output_handler: Option<OutputHandler>,
+    variables: HashMap<String, Value>,
+    functions: HashMap<String, (Vec<String>, Vec<Stmt>)>,
+    output_handler: Option<OutputHandler>,
+    plot_handler: Option<PlotHandler>,
 }
 
 impl Interpreter {
@@ -28,30 +30,33 @@ impl Interpreter {
             variables: HashMap::new(),
             functions: HashMap::new(),
             output_handler: None,
+            plot_handler: None,
         }
     }
-
-    // Метод, которого не хватало — теперь он есть
+    
     pub fn set_output_handler(&mut self, handler: OutputHandler) {
         self.output_handler = Some(handler);
     }
-
-    // Вспомогательный метод для вывода — используй его вместо println!
-    pub fn print(&mut self, text: String) {
+    
+    pub fn set_plot_handler(&mut self, handler: PlotHandler) {
+        self.plot_handler = Some(handler);
+    }
+    
+    fn print(&mut self, text: String) {
         if let Some(ref mut handler) = self.output_handler {
             handler(text);
         } else {
             println!("{}", text);
         }
     }
-
+    
     pub fn execute(&mut self, program: Program) -> Result<(), String> {
         for stmt in program.statements {
             self.execute_statement(&stmt)?;
         }
         Ok(())
     }
-
+    
     fn execute_statement(&mut self, stmt: &Stmt) -> Result<Option<Value>, String> {
         match stmt {
             Stmt::ОбъявлениеПеременной { имя, значение } => {
@@ -61,6 +66,7 @@ impl Interpreter {
             }
             Stmt::Если { условие, тогда, иначе } => {
                 let cond = self.evaluate_expression(условие)?;
+                
                 if let Value::Булево(true) = cond {
                     for s in тогда {
                         if let Some(ret) = self.execute_statement(s)? {
@@ -82,6 +88,7 @@ impl Interpreter {
                     if let Value::Булево(false) = cond {
                         break;
                     }
+                    
                     for s in тело {
                         if let Some(ret) = self.execute_statement(s)? {
                             return Ok(Some(ret));
@@ -104,7 +111,7 @@ impl Interpreter {
             }
         }
     }
-
+    
     fn evaluate_expression(&mut self, expr: &Expr) -> Result<Value, String> {
         match expr {
             Expr::Число(n) => Ok(Value::Число(*n)),
@@ -119,6 +126,7 @@ impl Interpreter {
             Expr::БинарнаяОперация { левый, оператор, правый } => {
                 let left = self.evaluate_expression(левый)?;
                 let right = self.evaluate_expression(правый)?;
+                
                 match (left, оператор, right) {
                     (Value::Число(l), BinOp::Плюс, Value::Число(r)) => Ok(Value::Число(l + r)),
                     (Value::Число(l), BinOp::Минус, Value::Число(r)) => Ok(Value::Число(l - r)),
@@ -136,44 +144,101 @@ impl Interpreter {
                     (Value::Число(l), BinOp::Меньше, Value::Число(r)) => Ok(Value::Булево(l < r)),
                     (Value::Число(l), BinOp::БольшеРавно, Value::Число(r)) => Ok(Value::Булево(l >= r)),
                     (Value::Число(l), BinOp::МеньшеРавно, Value::Число(r)) => Ok(Value::Булево(l <= r)),
+                    
                     (Value::Строка(l), BinOp::Плюс, Value::Строка(r)) => {
                         Ok(Value::Строка(format!("{}{}", l, r)))
                     }
+                    
                     _ => Err("Неподдерживаемая операция".to_string()),
                 }
             }
             Expr::ВызовФункции { имя, аргументы } => {
+                // Встроенная функция печать
                 if имя == "печать" {
                     let mut output_parts = Vec::new();
                     for arg in аргументы {
                         let val = self.evaluate_expression(arg)?;
                         output_parts.push(format_value(&val));
                     }
-                    // ← Вот здесь используем наш print вместо println!
                     self.print(output_parts.join(" "));
                     return Ok(Value::Пусто);
                 }
-
+                
+                // Встроенная функция график
+                if имя == "график" {
+                    if аргументы.len() < 3 {
+                        return Err("график требует: функция, от, до".to_string());
+                    }
+                    
+                    // Получить имя функции
+                    let func_name = match &аргументы[0] {
+                        Expr::Идентификатор(name) => name.clone(),
+                        _ => return Err("Первый аргумент должен быть функцией".to_string()),
+                    };
+                    
+                    let from = match self.evaluate_expression(&аргументы[1])? {
+                        Value::Число(n) => n,
+                        _ => return Err("Второй аргумент должен быть числом".to_string()),
+                    };
+                    
+                    let to = match self.evaluate_expression(&аргументы[2])? {
+                        Value::Число(n) => n,
+                        _ => return Err("Третий аргумент должен быть числом".to_string()),
+                    };
+                    
+                    // Вычислить точки
+                    let steps = 200;
+                    let step = (to - from) / steps as f64;
+                    let mut points = Vec::new();
+                    
+                    for i in 0..=steps {
+                        let x = from + i as f64 * step;
+                        
+                        // Вызвать функцию с x
+                        let result = self.evaluate_expression(&Expr::ВызовФункции {
+                            имя: func_name.clone(),
+                            аргументы: vec![Expr::Число(x)],
+                        })?;
+                        
+                        if let Value::Число(y) = result {
+                            if y.is_finite() {
+                                points.push((x, y));
+                            }
+                        }
+                    }
+                    
+                    // Отправить график
+                    if let Some(ref mut handler) = self.plot_handler {
+                        handler(PlotData {
+                            points,
+                            color: "#0066cc".to_string(),
+                            label: func_name,
+                        });
+                    }
+                    
+                    return Ok(Value::Пусто);
+                }
+                
                 // Пользовательские функции
                 if let Some((params, body)) = self.functions.get(имя).cloned() {
                     let mut arg_values = Vec::new();
                     for arg in аргументы {
                         arg_values.push(self.evaluate_expression(arg)?);
                     }
-
+                    
                     if params.len() != arg_values.len() {
                         return Err(format!(
                             "Функция '{}' ожидает {} аргументов, получено {}",
                             имя, params.len(), arg_values.len()
                         ));
                     }
-
+                    
                     let old_vars = self.variables.clone();
-
+                    
                     for (param, val) in params.iter().zip(arg_values.iter()) {
                         self.variables.insert(param.clone(), val.clone());
                     }
-
+                    
                     let mut result = Value::Пусто;
                     for stmt in &body {
                         if let Some(ret) = self.execute_statement(stmt)? {
@@ -181,9 +246,9 @@ impl Interpreter {
                             break;
                         }
                     }
-
+                    
                     self.variables = old_vars;
-
+                    
                     Ok(result)
                 } else {
                     Err(format!("Функция '{}' не найдена", имя))

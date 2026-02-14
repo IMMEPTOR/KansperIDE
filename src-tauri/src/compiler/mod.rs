@@ -4,19 +4,29 @@ pub mod parser;
 pub mod interpreter;
 
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompilationResult {
     pub success: bool,
     pub output: String,
     pub errors: Vec<String>,
+    pub plots: Vec<PlotData>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlotData {
+    pub points: Vec<(f64, f64)>,
+    pub color: String,
+    pub label: String,
 }
 
 pub fn compile_and_run(code: String) -> CompilationResult {
-    use std::sync::{Arc, Mutex};
-    
     let output = Arc::new(Mutex::new(String::new()));
     let output_clone = output.clone();
+    
+    let plots = Arc::new(Mutex::new(Vec::new()));
+    let plots_clone = plots.clone();
     
     let mut errors = Vec::new();
     
@@ -32,6 +42,7 @@ pub fn compile_and_run(code: String) -> CompilationResult {
                 success: false,
                 output: String::new(),
                 errors,
+                plots: Vec::new(),
             };
         }
     };
@@ -55,6 +66,7 @@ pub fn compile_and_run(code: String) -> CompilationResult {
                 success: false,
                 output: String::new(),
                 errors,
+                plots: Vec::new(),
             };
         }
     };
@@ -69,22 +81,32 @@ pub fn compile_and_run(code: String) -> CompilationResult {
         out.push('\n');
     }));
     
+    // Перехватываем графики
+    interpreter.set_plot_handler(Box::new(move |plot| {
+        let mut p = plots_clone.lock().unwrap();
+        p.push(plot);
+    }));
+    
     match interpreter.execute(program) {
         Ok(_) => {
             let final_output = output.lock().unwrap().clone();
+            let final_plots = plots.lock().unwrap().clone();
             CompilationResult {
                 success: true,
                 output: final_output,
                 errors: Vec::new(),
+                plots: final_plots,
             }
         }
         Err(e) => {
             errors.push(e);
             let final_output = output.lock().unwrap().clone();
+            let final_plots = plots.lock().unwrap().clone();
             CompilationResult {
                 success: false,
                 output: final_output,
                 errors,
+                plots: final_plots,
             }
         }
     }

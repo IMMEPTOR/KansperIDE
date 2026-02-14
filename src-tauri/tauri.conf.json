@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "rus-ide",
-  "version": "0.1.0",
-  "identifier": "com.yroslav.rus-ide.dev",  
+  "productName": "Рус IDE",
+  "version": "1.0.0",
+  "identifier": "com.yroslav.rus-ide",  
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -12,27 +12,42 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Рус IDE",
-        "width": 1100,
+        "width": 1200,
         "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "center": true
       }
     ],
-    "withGlobalTauri": true,                
+    "withGlobalTauri": true,
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": ["default"]
     }
   },
   "bundle": {
     "active": true,
+    "category": "DeveloperTool",
+    "copyright": "Copyright © 2026 Рус IDE",
+    "shortDescription": "IDE для языка программирования Рус",
+    "longDescription": "Интегрированная среда разработки для русскоязычного языка программирования",
+    "targets": "all",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "wix": {
+        "language": "ru-RU"
+      }
+    }
   },
   "plugins": {}
 }

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CodeEditor } from './components/Editor';
 import { Console } from './components/Console';
+import { GraphCanvas } from './components/GraphCanvas';
 import { useRusCompiler } from './hooks/useRusCompiler';
 import './App.css';
 
@@ -8,10 +9,12 @@ const EXAMPLE_CODE = `// Добро пожаловать в Рус IDE!
 
 печать("Привет, мир!");
 
+// Пример работы с переменными
 пусть х = 10;
 пусть у = 20;
 печать("Сумма:", х + у);
 
+// Пример функции
 функция факториал(н) {
     если (н < 2) {
         вернуть 1;
@@ -22,32 +25,125 @@ const EXAMPLE_CODE = `// Добро пожаловать в Рус IDE!
 
 печать("Факториал 5:", факториал(5));
 
-пусть счетчик = 0;
-пока (счетчик < 3) {
-    печать("Итерация", счетчик);
-    счетчик = счетчик + 1;
+// Пример графика
+функция квадрат(х) {
+    вернуть х * х;
 }
+
+график(квадрат, -5, 5);
 `;
 
 function App() {
   const [code, setCode] = useState(EXAMPLE_CODE);
-  const { runCode, isRunning, output, errors } = useRusCompiler();
+  const [fileName, setFileName] = useState('Без имени');
+  const [isModified, setIsModified] = useState(false);
+  const [plots, setPlots] = useState<any[]>([]);
+  
+  const { 
+    runCode, 
+    saveFile, 
+    saveFileAs, 
+    openFile, 
+    newFile,
+    isRunning, 
+    output, 
+    errors,
+    currentFilePath 
+  } = useRusCompiler();
 
   const handleRun = async () => {
-    await runCode(code);
+    const result = await runCode(code);
+    console.log('Result:', result); // Для отладки
+    if (result?.plots) {
+      console.log('Plots:', result.plots); // Для отладки
+      setPlots(result.plots);
+    } else {
+      setPlots([]);
+    }
+  };
+
+  const handleCodeChange = (newCode: string) => {
+    setCode(newCode);
+    setIsModified(true);
+  };
+
+  const handleSave = async () => {
+    const result = await saveFile(code);
+    if (result.success) {
+      setIsModified(false);
+      if (result.path) {
+        const name = result.path.split('/').pop() || result.path.split('\\').pop() || 'Файл';
+        setFileName(name);
+      }
+    }
+  };
+
+  const handleSaveAs = async () => {
+    const result = await saveFileAs(code);
+    if (result.success && result.path) {
+      setIsModified(false);
+      const name = result.path.split('/').pop() || result.path.split('\\').pop() || 'Файл';
+      setFileName(name);
+    }
+  };
+
+  const handleOpen = async () => {
+    if (isModified) {
+      // Используем нативный confirm вместо Tauri dialog
+      const confirmed = window.confirm('Есть несохраненные изменения. Продолжить?');
+      if (!confirmed) return;
+    }
+    
+    const result = await openFile();
+    if (result) {
+      setCode(result.content);
+      setIsModified(false);
+      const name = result.path.split('/').pop() || result.path.split('\\').pop() || 'Файл';
+      setFileName(name);
+    }
+  };
+
+  const handleNew = () => {
+    if (isModified) {
+      const confirmed = window.confirm('Есть несохраненные изменения. Продолжить?');
+      if (!confirmed) return;
+    }
+    
+    setCode('');
+    setFileName('Без имени');
+    setIsModified(false);
+    setPlots([]);
+    newFile();
   };
 
   return (
     <div className="app">
       <header className="header">
-        <h1>🇷🇺 РУС IDE</h1>
+        <div className="header-left">
+          <h1>🇷🇺 РУС IDE</h1>
+          <span className="file-name">{fileName}{isModified ? ' •' : ''}</span>
+        </div>
         <div className="toolbar">
+          <button onClick={handleNew} className="btn-secondary" title="Создать новый файл">
+            📄 Новый
+          </button>
+          <button onClick={handleOpen} className="btn-secondary" title="Открыть файл">
+            📂 Открыть
+          </button>
+          <button onClick={handleSave} className="btn-secondary" title="Сохранить">
+            💾 Сохранить
+          </button>
+          <button onClick={handleSaveAs} className="btn-secondary" title="Сохранить как">
+            💾 Сохранить как...
+          </button>
+          <div className="divider" />
           <button 
             onClick={handleRun} 
             disabled={isRunning}
             className="btn-primary"
+            title="Запустить программу (Ctrl+Enter)"
           >
-            ▶ Запустить (Ctrl+Enter)
+            {isRunning ? '⏸ Выполняется...' : '▶ Запустить'}
           </button>
         </div>
       </header>
@@ -56,17 +152,21 @@ function App() {
         <div className="editor-panel">
           <CodeEditor 
             value={code} 
-            onChange={setCode}
+            onChange={handleCodeChange}
             onRun={handleRun}
           />
         </div>
         
-        <div className="console-panel">
-          <Console 
-            output={output}
-            errors={errors}
-            isRunning={isRunning}
-          />
+        <div className="right-panel">
+          <div className="console-panel">
+            <Console 
+              output={output}
+              errors={errors}
+              isRunning={isRunning}
+            />
+          </div>
+          
+          <GraphCanvas plots={plots} />
         </div>
       </div>
     </div>

@@ -213,7 +213,7 @@ impl Parser {
     }
     
     fn parse_factor(&mut self) -> Expr {
-        let mut left = self.parse_primary();
+        let mut left = self.parse_unary();
         
         while matches!(self.current_token(), Token::Умножить | Token::Разделить) {
             let op = match self.current_token() {
@@ -223,7 +223,7 @@ impl Parser {
             };
             self.advance();
             
-            let right = self.parse_primary();
+            let right = self.parse_unary();
             left = Expr::БинарнаяОперация {
                 левый: Box::new(left),
                 оператор: op,
@@ -232,6 +232,25 @@ impl Parser {
         }
         
         left
+    }
+    
+    fn parse_unary(&mut self) -> Expr {
+        match self.current_token() {
+            Token::Минус => {
+                self.advance();
+                let expr = self.parse_unary();
+                Expr::БинарнаяОперация {
+                    левый: Box::new(Expr::Число(0.0)),
+                    оператор: BinOp::Минус,
+                    правый: Box::new(expr),
+                }
+            }
+            Token::Плюс => {
+                self.advance();
+                self.parse_unary()
+            }
+            _ => self.parse_primary(),
+        }
     }
     
     fn parse_primary(&mut self) -> Expr {
