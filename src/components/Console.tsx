@@ -18,15 +18,15 @@ export function Console({ output, errors, isRunning }: ConsoleProps) {
   return (
     <div style={styles.console}>
       <div style={styles.header}>
-        <span>💻 Консоль</span>
-        {isRunning && <span style={styles.running}>▶ Выполняется...</span>}
+        <span>Консоль</span>
+        {isRunning && <span style={styles.running}>Выполняется...</span>}
       </div>
       <div style={styles.content} ref={consoleRef}>
         {errors.length > 0 && (
           <div style={styles.errors}>
             {errors.map((error, i) => (
               <div key={i} style={styles.errorLine}>
-                ❌ {error}
+                Ошибка: {error}
               </div>
             ))}
           </div>
@@ -66,20 +66,20 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     color: '#d4d4d4',
-    fontSize: '13px',
+    fontSize: 13,
     fontWeight: 500,
     flexShrink: 0,
   },
   running: {
     color: '#4ec9b0',
-    fontSize: '12px',
+    fontSize: 12,
   },
   content: {
     flex: 1,
     padding: '15px',
     overflowY: 'auto' as const,
     fontFamily: 'Consolas, "Courier New", monospace',
-    fontSize: '13px',
+    fontSize: 13,
   },
   errors: {
     marginBottom: '10px',
@@ -95,7 +95,7 @@ const styles = {
   outputLine: {
     color: '#d4d4d4',
     padding: '2px 0',
-    lineHeight: '1.5',
+    lineHeight: 1.5,
   },
   empty: {
     color: '#6a6a6a',
