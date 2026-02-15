@@ -18,7 +18,7 @@ export function Console({ output, errors, isRunning }: ConsoleProps) {
   return (
     <div style={styles.console}>
       <div style={styles.header}>
-        <span>Консоль</span>
+        <span>💻 Консоль</span>
         {isRunning && <span style={styles.running}>▶ Выполняется...</span>}
       </div>
       <div style={styles.content} ref={consoleRef}>
@@ -56,6 +56,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as const,
     background: '#1e1e1e',
+    overflow: 'hidden',
   },
   header: {
     padding: '10px 15px',
@@ -65,6 +66,9 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     color: '#d4d4d4',
+    fontSize: '13px',
+    fontWeight: 500,
+    flexShrink: 0,
   },
   running: {
     color: '#4ec9b0',
@@ -74,7 +78,7 @@ const styles = {
     flex: 1,
     padding: '15px',
     overflowY: 'auto' as const,
-    fontFamily: 'Consolas, monospace',
+    fontFamily: 'Consolas, "Courier New", monospace',
     fontSize: '13px',
   },
   errors: {
@@ -91,9 +95,10 @@ const styles = {
   outputLine: {
     color: '#d4d4d4',
     padding: '2px 0',
+    lineHeight: '1.5',
   },
   empty: {
     color: '#6a6a6a',
-    fontStyle: 'italic',
+    fontStyle: 'italic' as const,
   },
 };

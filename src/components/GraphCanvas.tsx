@@ -4,7 +4,7 @@ interface PlotData {
   points: [number, number][];
   color: string;
   label: string;
-  timestamp?: number; // ДОБАВИЛИ
+  timestamp?: number;
 }
 
 interface GraphCanvasProps {
@@ -14,19 +14,35 @@ interface GraphCanvasProps {
 export function GraphCanvas({ plots }: GraphCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useLayoutEffect(() => {
-    console.log('📊 GraphCanvas redraw triggered');
-    
-    if (plots.length > 0) {
-      console.log('Plot data:', {
-        label: plots[0].label,
-        timestamp: plots[0].timestamp,
-        pointsCount: plots[0].points.length,
-        first: plots[0].points[0],
-        middle: plots[0].points[100],
-        last: plots[0].points[plots[0].points.length - 1]
-      });
+  const handleSavePNG = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      console.error('Canvas not found');
+      return;
     }
+
+    try {
+      // Создать ссылку для скачивания
+      const link = document.createElement('a');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      link.download = `график-${timestamp}.png`;
+      
+      // Конвертировать canvas в data URL
+      link.href = canvas.toDataURL('image/png');
+      
+      // Триггернуть скачивание
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('✅ PNG saved successfully');
+    } catch (error) {
+      console.error('❌ Error saving PNG:', error);
+    }
+  };
+
+  useLayoutEffect(() => {
+    console.log('📊 GraphCanvas redraw:', plots.length, 'plots');
     
     const canvas = canvasRef.current;
     if (!canvas || plots.length === 0) return;
@@ -53,8 +69,6 @@ export function GraphCanvas({ plots }: GraphCanvasProps) {
         }
       });
     });
-
-    console.log('Y range:', yMin, 'to', yMax);
 
     const xPadding = (xMax - xMin) * 0.1;
     const yPadding = (yMax - yMin) * 0.1;
@@ -98,24 +112,24 @@ export function GraphCanvas({ plots }: GraphCanvasProps) {
     ctx.fillStyle = '#d4d4d4';
     ctx.font = '12px monospace';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
     for (let i = 0; i <= 5; i++) {
       const x = padding + (i / 5) * width;
       const val = xMin + (i / 5) * (xMax - xMin);
-      ctx.fillText(val.toFixed(1), x, canvas.height - padding + 20);
+      ctx.fillText(val.toFixed(1), x, canvas.height - padding + 10);
     }
 
     // Подписи Y
     ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
     for (let i = 0; i <= 5; i++) {
       const y = canvas.height - padding - (i / 5) * height;
       const val = yMin + (i / 5) * (yMax - yMin);
-      ctx.fillText(val.toFixed(1), padding - 10, y + 4);
+      ctx.fillText(val.toFixed(1), padding - 10, y);
     }
 
     // График
-    plots.forEach((plot) => {
-      console.log(`Drawing ${plot.label}...`);
-      
+    plots.forEach((plot, idx) => {
       ctx.strokeStyle = plot.color;
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
@@ -138,21 +152,35 @@ export function GraphCanvas({ plots }: GraphCanvasProps) {
       ctx.stroke();
       
       // Легенда
-      ctx.fillStyle = plot.color;
-      ctx.fillRect(canvas.width - 150, 30, 40, 3);
+      const legendX = canvas.width - padding - 150;
+      const legendY = padding + 20 + idx * 30;
+      
+      ctx.strokeStyle = plot.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(legendX, legendY);
+      ctx.lineTo(legendX + 40, legendY);
+      ctx.stroke();
+      
       ctx.fillStyle = '#d4d4d4';
       ctx.font = '13px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(plot.label, canvas.width - 100, 33);
+      ctx.textBaseline = 'middle';
+      ctx.fillText(plot.label, legendX + 50, legendY);
     });
 
     console.log('✅ Drawing complete');
-  }, [plots]); // React будет сравнивать по ссылке
+  }, [plots]);
 
   if (plots.length === 0) {
     return (
       <div style={styles.container}>
-        <div style={styles.header}>📈 График (нет данных)</div>
+        <div style={styles.header}>
+          <span>📈 График</span>
+        </div>
+        <div style={styles.emptyState}>
+          Запустите программу с функцией график() для отображения
+        </div>
       </div>
     );
   }
@@ -160,33 +188,107 @@ export function GraphCanvas({ plots }: GraphCanvasProps) {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        📈 График - {plots[0]?.label} 
-        {plots[0]?.timestamp && ` (${new Date(plots[0].timestamp).toLocaleTimeString()})`}
+        <span>📈 График</span>
+        <button 
+          onClick={handleSavePNG} 
+          style={styles.saveButton}
+          title="Сохранить график как PNG"
+        >
+          💾 Сохранить PNG
+        </button>
       </div>
-      <canvas 
-        ref={canvasRef} 
-        width={800} 
-        height={500} 
-        style={styles.canvas}
-      />
+      <div style={styles.canvasContainer}>
+        <canvas 
+          ref={canvasRef} 
+          width={800} 
+          height={500} 
+          style={styles.canvas}
+        />
+      </div>
+      <div style={styles.info}>
+        {plots.map((plot, idx) => (
+          <div key={idx} style={styles.plotInfo}>
+            <span style={{ ...styles.colorDot, backgroundColor: plot.color }}></span>
+            <span>{plot.label}: {plot.points.length} точек</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 const styles = {
   container: {
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column' as const,
     background: '#1e1e1e',
-    borderTop: '1px solid #3e3e42',
+    overflow: 'hidden',
   },
   header: {
-    padding: '10px',
+    padding: '10px 15px',
     background: '#2d2d30',
+    borderBottom: '1px solid #3e3e42',
     color: '#d4d4d4',
-    fontSize: '14px',
+    fontSize: '13px',
+    fontWeight: 500,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  saveButton: {
+    padding: '6px 12px',
+    background: '#0e639c',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+    fontWeight: 500,
+  } as React.CSSProperties,
+  canvasContainer: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'auto',
+    padding: '20px',
   },
   canvas: {
+    border: '1px solid #3e3e42',
     display: 'block',
-    margin: '20px auto',
-    border: '1px solid #444',
+  },
+  emptyState: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#6a6a6a',
+    fontStyle: 'italic' as const,
+    padding: '40px',
+    textAlign: 'center' as const,
+  },
+  info: {
+    padding: '10px 15px',
+    borderTop: '1px solid #3e3e42',
+    display: 'flex',
+    gap: '20px',
+    flexWrap: 'wrap' as const,
+    fontSize: '12px',
+    color: '#cccccc',
+    flexShrink: 0,
+  },
+  plotInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  colorDot: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    display: 'inline-block',
   },
 };

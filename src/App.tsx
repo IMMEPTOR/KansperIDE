@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { CodeEditor } from './components/Editor';
 import { Console } from './components/Console';
 import { GraphCanvas } from './components/GraphCanvas';
@@ -39,6 +39,14 @@ function App() {
   const [isModified, setIsModified] = useState(false);
   const [plots, setPlots] = useState<any[]>([]);
   
+  // Состояния для resize
+  const [editorWidth, setEditorWidth] = useState(50); // процент
+  const [consoleHeight, setConsoleHeight] = useState(30); // процент
+  const [isResizingHorizontal, setIsResizingHorizontal] = useState(false);
+  const [isResizingVertical, setIsResizingVertical] = useState(false);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  
   const { 
     runCode, 
     saveFile, 
@@ -48,29 +56,76 @@ function App() {
     isRunning, 
     output, 
     errors,
-    currentFilePath 
   } = useRusCompiler();
 
+  // Горизонтальный resize (между редактором и графиком)
+  const handleMouseDownHorizontal = () => {
+    setIsResizingHorizontal(true);
+  };
+
+  // Вертикальный resize (между верхом и консолью)
+  const handleMouseDownVertical = () => {
+    setIsResizingVertical(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+    if (!containerRef.current) return;
+
+    if (isResizingHorizontal) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const newWidth = ((e.clientX - rect.left) / rect.width) * 100;
+      if (newWidth > 25 && newWidth < 75) {
+        setEditorWidth(newWidth);
+      }
+    }
+
+    if (isResizingVertical) {
+      const rect = containerRef.current.getBoundingClientRect();
+      // Правильное вычисление от верха контейнера
+      const clickY = e.clientY - rect.top;
+      const newTopHeight = (clickY / rect.height) * 100;
+      const newConsoleHeight = 100 - newTopHeight;
+      
+      if (newConsoleHeight > 15 && newConsoleHeight < 60) {
+        setConsoleHeight(newConsoleHeight);
+      }
+    }
+  };
+
+    const handleMouseUp = () => {
+      setIsResizingHorizontal(false);
+      setIsResizingVertical(false);
+    };
+
+    if (isResizingHorizontal || isResizingVertical) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = isResizingHorizontal ? 'col-resize' : 'row-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingHorizontal, isResizingVertical]);
+
   const handleRun = async () => {
-  console.log('Running code...');
-  setPlots([]);  // Добавь эту строку для принудительной очистки перед запуском
-  
-  const result = await runCode(code);
-  
-  if (result?.plots) {
-    console.log('NEW plots received:', {
-      count: result.plots.length,
-      timestamps: result.plots.map((p: any) => p.timestamp),
-      firstPlot: result.plots[0]
-    });
+    console.log('🚀 Running code...');
+    const result = await runCode(code);
+    console.log('📦 Result:', result);
     
-    // Создать НОВЫЙ массив для принудительного обновления React
-    setPlots([...result.plots]);
-  } else {
-    console.log('No plots');
-    setPlots([]);
-  }
-};
+    if (result?.plots) {
+      console.log('📊 Plots received:', result.plots.length);
+      setPlots([...result.plots]);
+    } else {
+      console.log('❌ No plots');
+      setPlots([]);
+    }
+  };
 
   const handleCodeChange = (newCode: string) => {
     setCode(newCode);
@@ -99,7 +154,6 @@ function App() {
 
   const handleOpen = async () => {
     if (isModified) {
-      // Используем нативный confirm вместо Tauri dialog
       const confirmed = window.confirm('Есть несохраненные изменения. Продолжить?');
       if (!confirmed) return;
     }
@@ -158,27 +212,60 @@ function App() {
         </div>
       </header>
       
-      <div className="main-content">
-        <div className="editor-panel">
-          <CodeEditor 
-            value={code} 
-            onChange={handleCodeChange}
-            onRun={handleRun}
+      <div className="main-container" ref={containerRef}>
+        {/* Верхняя часть: редактор СЛЕВА, график СПРАВА */}
+        <div 
+          className="top-section"
+          style={{ height: `${100 - consoleHeight}%` }}
+        >
+          {/* Левая панель - Редактор */}
+          <div 
+            className="editor-panel"
+            style={{ width: `${editorWidth}%` }}
+          >
+            <div className="panel-header">
+              <span>📝 Редактор кода</span>
+            </div>
+            <div className="editor-content">
+              <CodeEditor 
+                value={code} 
+                onChange={handleCodeChange}
+                onRun={handleRun}
+              />
+            </div>
+          </div>
+
+          {/* Вертикальный разделитель */}
+          <div 
+            className="resize-handle resize-handle-vertical"
+            onMouseDown={handleMouseDownHorizontal}
           />
+
+          {/* Правая панель - График */}
+          <div 
+            className="graph-panel"
+            style={{ width: `${100 - editorWidth}%` }}
+          >
+            <GraphCanvas plots={plots} />
+          </div>
         </div>
-        
-        <div className="right-panel">
-          <div className="console-panel">
-            <Console 
-              output={output}
-              errors={errors}
-              isRunning={isRunning}
-            />
-          </div>
-          
-          <div className="graph-container">
-            <GraphCanvas plots={plots} key={JSON.stringify(plots)} />
-          </div>
+
+        {/* Горизонтальный разделитель */}
+        <div 
+          className="resize-handle resize-handle-horizontal"
+          onMouseDown={handleMouseDownVertical}
+        />
+
+        {/* Нижняя панель - Консоль (на ВСЮ ширину) */}
+        <div 
+          className="bottom-section"
+          style={{ height: `${consoleHeight}%` }}
+        >
+          <Console 
+            output={output}
+            errors={errors}
+            isRunning={isRunning}
+          />
         </div>
       </div>
     </div>

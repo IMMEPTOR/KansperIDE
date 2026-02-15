@@ -16,8 +16,10 @@ body {
   flex-direction: column;
   height: 100vh;
   width: 100vw;
+  background: #1e1e1e;
 }
 
+/* Header */
 .header {
   background: #2d2d30;
   padding: 10px 20px;
@@ -25,7 +27,14 @@ body {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid #3e3e42;
-  min-height: 50px;
+  height: 50px;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 .header h1 {
@@ -34,9 +43,23 @@ body {
   margin: 0;
 }
 
+.file-name {
+  font-size: 14px;
+  color: #cccccc;
+  font-weight: 500;
+}
+
 .toolbar {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  align-items: center;
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  background: #3e3e42;
+  margin: 0 4px;
 }
 
 button {
@@ -44,9 +67,10 @@ button {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.2s;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -63,26 +87,116 @@ button {
   cursor: not-allowed;
 }
 
-.main-content {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
+.btn-secondary {
+  background: #3e3e42;
+  color: #d4d4d4;
 }
 
-.editor-panel {
-  flex: 2;
-  border-right: 1px solid #3e3e42;
-  overflow: hidden;
+.btn-secondary:hover {
+  background: #505053;
 }
 
-.console-panel {
+/* Main Container */
+.main-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+  min-height: 0; /* ВАЖНО для flex */
 }
 
-/* Scrollbar styles */
+/* Top Section - Editor LEFT, Graph RIGHT */
+.top-section {
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0; /* ВАЖНО - не сжиматься */
+  min-height: 200px; /* ВАЖНО - минимальная высота */
+}
+
+/* Bottom Section - Console FULL WIDTH */
+.bottom-section {
+  overflow: hidden;
+  flex-shrink: 0; /* ВАЖНО - не сжиматься */
+  min-height: 150px; /* ВАЖНО - минимальная высота */
+  max-height: 500px;
+  display: flex; /* ВАЖНО */
+  flex-direction: column; /* ВАЖНО */
+}
+
+/* Resize Handles */
+.resize-handle {
+  background: #3e3e42;
+  transition: background 0.2s;
+  z-index: 100;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.resize-handle:hover {
+  background: #0e639c;
+}
+
+.resize-handle:active {
+  background: #1177bb;
+}
+
+.resize-handle-vertical {
+  width: 4px;
+  cursor: col-resize;
+  min-width: 4px;
+  max-width: 4px;
+}
+
+.resize-handle-horizontal {
+  height: 4px;
+  cursor: row-resize;
+  min-height: 4px;
+  max-height: 4px;
+  width: 100%;
+}
+
+/* Editor Panel */
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  overflow: hidden;
+  min-width: 300px;
+  position: relative;
+}
+
+.panel-header {
+  padding: 10px 15px;
+  background: #2d2d30;
+  border-bottom: 1px solid #3e3e42;
+  color: #d4d4d4;
+  font-size: 13px;
+  font-weight: 500;
+  flex-shrink: 0;
+  height: 40px;
+}
+
+.editor-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  min-height: 0;
+}
+
+/* Graph Panel */
+.graph-panel {
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  overflow: hidden;
+  min-width: 300px;
+  position: relative;
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -101,42 +215,21 @@ button {
   background: #4e4e4e;
 }
 
-.right-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-left: 1px solid #3e3e42;
+/* Debugging - раскомментируйте чтобы увидеть границы */
+/*
+.top-section {
+  border: 2px solid red;
 }
 
-.console-panel {
-  flex: 1;
-  min-height: 250px;
-  overflow: hidden;
+.bottom-section {
+  border: 2px solid blue;
 }
 
-.right-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+.editor-panel {
+  border: 2px solid green;
 }
 
-.console-panel {
-  flex: 1;
-  min-height: 250px;
-  max-height: 50%;
-  overflow: hidden;
+.graph-panel {
+  border: 2px solid yellow;
 }
-
-.graph-container {
-  width: 100%;  /* или fixed, напр. 50vw для правой панели */
-  height: 400px;  /* фиксированная высота, или 100% */
-  overflow: hidden;  /* скрывает overflow */
-  border: 1px solid #ccc;  /* для видимости */
-  position: relative;
-}
-.graph-container canvas {
-  width: 100%;
-  height: 100%;
-}
+*/
