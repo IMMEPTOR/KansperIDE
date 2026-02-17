@@ -1,4 +1,4 @@
-import React, { useRef, useLayoutEffect, useState, useEffect } from 'react';
+import React, { useRef, useLayoutEffect, useState } from 'react';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
 
@@ -11,44 +11,21 @@ interface PlotData {
 
 interface GraphCanvasProps {
   plots: PlotData[];
+  onClose?: () => void;
 }
 
-type Theme = 'dark' | 'light';
-
-const THEMES = {
-  dark: {
-    background: '#1a1a1a',
-    gridMajor: '#333333',
-    gridMinor: '#222222',
-    axis: '#666666',
-    text: '#e0e0e0',
-    textBg: 'rgba(0, 0, 0, 0.7)',
-  },
-  light: {
-    background: '#ffffff',
-    gridMajor: '#cccccc',
-    gridMinor: '#e8e8e8',
-    axis: '#666666',
-    text: '#333333',
-    textBg: 'rgba(255, 255, 255, 0.8)',
-  },
-};
-
 const PLOT_COLORS = [
-  '#2196F3', // Синий
-  '#F44336', // Красный
-  '#4CAF50', // Зеленый
-  '#FF9800', // Оранжевый
-  '#9C27B0', // Фиолетовый
-  '#00BCD4', // Голубой
+  '#4A90E2',
+  '#E74C3C',
+  '#2ECC71',
+  '#F39C12',
+  '#9B59B6',
+  '#1ABC9C',
 ];
 
-export function GraphCanvas({ plots }: GraphCanvasProps) {
+export function GraphCanvas({ plots, onClose }: GraphCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  const [theme, setTheme] = useState<Theme>('dark');
-  const [zoom, setZoom] = useState(1);
 
   const handleSavePNG = async () => {
     const canvas = canvasRef.current;
@@ -81,84 +58,12 @@ export function GraphCanvas({ plots }: GraphCanvasProps) {
     }
   };
 
-  const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 0.2, 3));
-  };
+  const renderGraph = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    // Очистка
+    ctx.fillStyle = '#2b2d30';
+    ctx.fillRect(0, 0, width, height);
 
-  const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev - 0.2, 0.5));
-  };
-
-  const handleZoomReset = () => {
-    setZoom(1);
-  };
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-  };
-
-  // Обработка Cmd/Ctrl + колесико мыши для масштабирования
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        setZoom(prev => Math.max(0.5, Math.min(3, prev + delta)));
-      }
-    };
-
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('wheel', handleWheel, { passive: false });
-    }
-
-    return () => {
-      if (container) {
-        container.removeEventListener('wheel', handleWheel);
-      }
-    };
-  }, []);
-
-  // Обработка Cmd/Ctrl + +/- для масштабирования
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey)) {
-        if (e.key === '=' || e.key === '+') {
-          e.preventDefault();
-          handleZoomIn();
-        } else if (e.key === '-' || e.key === '_') {
-          e.preventDefault();
-          handleZoomOut();
-        } else if (e.key === '0') {
-          e.preventDefault();
-          handleZoomReset();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || plots.length === 0) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const colors = THEMES[theme];
-    const baseWidth = 1000;
-    const baseHeight = 700;
-    
-    // Применить масштаб
-    canvas.width = baseWidth * zoom;
-    canvas.height = baseHeight * zoom;
-    ctx.scale(zoom, zoom);
-
-    // Очистка фона
-    ctx.fillStyle = colors.background;
-    ctx.fillRect(0, 0, baseWidth, baseHeight);
+    if (plots.length === 0) return;
 
     // Найти границы данных
     let xMin = Infinity, xMax = -Infinity;
@@ -175,131 +80,137 @@ export function GraphCanvas({ plots }: GraphCanvasProps) {
       });
     });
 
-    // Добавить отступы к границам
-    const xPadding = (xMax - xMin) * 0.1 || 1;
-    const yPadding = (yMax - yMin) * 0.1 || 1;
-    xMin -= xPadding;
-    xMax += xPadding;
-    yMin -= yPadding;
-    yMax += yPadding;
+    // Расширить для симметрии
+    const xRange = Math.max(Math.abs(xMin), Math.abs(xMax));
+    const yRange = Math.max(Math.abs(yMin), Math.abs(yMax));
+    
+    xMin = -xRange * 1.2;
+    xMax = xRange * 1.2;
+    yMin = -yRange * 1.2;
+    yMax = yRange * 1.2;
 
-    const padding = 80;
-    const graphWidth = baseWidth - 2 * padding;
-    const graphHeight = baseHeight - 2 * padding;
+    const padding = 50;
+    const graphWidth = width - 2 * padding;
+    const graphHeight = height - 2 * padding;
 
-    const scaleX = (x: number) => padding + ((x - xMin) / (xMax - xMin)) * graphWidth;
-    const scaleY = (y: number) => baseHeight - padding - ((y - yMin) / (yMax - yMin)) * graphHeight;
+    const centerX = width / 2;
+    const centerY = height / 2;
 
-    // Размер клетки
-    const cellSize = 20;
+    const scaleX = (x: number) => centerX + (x / xMax) * (graphWidth / 2);
+    const scaleY = (y: number) => centerY - (y / yMax) * (graphHeight / 2);
 
-    // Нарисовать мелкие клетки (как на тетрадной бумаге)
-    ctx.strokeStyle = colors.gridMinor;
+    // Сетка
+    ctx.strokeStyle = '#404040';
     ctx.lineWidth = 0.5;
-    
-    for (let x = padding; x <= baseWidth - padding; x += cellSize) {
+
+    const gridSteps = 10;
+    const xStep = xMax / (gridSteps / 2);
+    const yStep = yMax / (gridSteps / 2);
+
+    for (let i = -gridSteps / 2; i <= gridSteps / 2; i++) {
+      // Вертикальные
+      const x = scaleX(i * xStep);
       ctx.beginPath();
       ctx.moveTo(x, padding);
-      ctx.lineTo(x, baseHeight - padding);
+      ctx.lineTo(x, height - padding);
       ctx.stroke();
-    }
-    
-    for (let y = padding; y <= baseHeight - padding; y += cellSize) {
+      
+      // Горизонтальные
+      const y = scaleY(i * yStep);
       ctx.beginPath();
       ctx.moveTo(padding, y);
-      ctx.lineTo(baseWidth - padding, y);
+      ctx.lineTo(width - padding, y);
       ctx.stroke();
     }
 
-    // Нарисовать основные линии сетки (каждая 5-я клетка)
-    ctx.strokeStyle = colors.gridMajor;
-    ctx.lineWidth = 1;
-    
-    for (let x = padding; x <= baseWidth - padding; x += cellSize * 5) {
-      ctx.beginPath();
-      ctx.moveTo(x, padding);
-      ctx.lineTo(x, baseHeight - padding);
-      ctx.stroke();
-    }
-    
-    for (let y = padding; y <= baseHeight - padding; y += cellSize * 5) {
-      ctx.beginPath();
-      ctx.moveTo(padding, y);
-      ctx.lineTo(baseWidth - padding, y);
-      ctx.stroke();
-    }
-
-    // Нарисовать оси
-    ctx.strokeStyle = colors.axis;
+    // Оси
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
-    
+
     // Ось Y
     ctx.beginPath();
-    ctx.moveTo(padding, padding);
-    ctx.lineTo(padding, baseHeight - padding);
+    ctx.moveTo(centerX, padding);
+    ctx.lineTo(centerX, height - padding);
     ctx.stroke();
-    
+
+    // Стрелка Y
+    ctx.beginPath();
+    ctx.moveTo(centerX, padding);
+    ctx.lineTo(centerX - 5, padding + 10);
+    ctx.lineTo(centerX + 5, padding + 10);
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
     // Ось X
     ctx.beginPath();
-    ctx.moveTo(padding, baseHeight - padding);
-    ctx.lineTo(baseWidth - padding, baseHeight - padding);
+    ctx.moveTo(padding, centerY);
+    ctx.lineTo(width - padding, centerY);
     ctx.stroke();
 
+    // Стрелка X
+    ctx.beginPath();
+    ctx.moveTo(width - padding, centerY);
+    ctx.lineTo(width - padding - 10, centerY - 5);
+    ctx.lineTo(width - padding - 10, centerY + 5);
+    ctx.closePath();
+    ctx.fill();
+
     // Подписи осей
-    ctx.fillStyle = colors.text;
-    ctx.font = '12px monospace';
+    ctx.fillStyle = '#afb1b3';
+    ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-
-    // Подписи X
-    const xSteps = 10;
-    for (let i = 0; i <= xSteps; i++) {
-      const x = padding + (i / xSteps) * graphWidth;
-      const val = xMin + (i / xSteps) * (xMax - xMin);
-      
-      // Фон
-      const text = val.toFixed(2);
-      const metrics = ctx.measureText(text);
-      ctx.fillStyle = colors.textBg;
-      ctx.fillRect(x - metrics.width / 2 - 2, baseHeight - padding + 5, metrics.width + 4, 14);
-      
-      ctx.fillStyle = colors.text;
-      ctx.fillText(text, x, baseHeight - padding + 8);
-    }
-
-    // Подписи Y
+    ctx.fillText('x', width - padding + 15, centerY - 8);
     ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    const ySteps = 10;
-    for (let i = 0; i <= ySteps; i++) {
-      const y = baseHeight - padding - (i / ySteps) * graphHeight;
-      const val = yMin + (i / ySteps) * (yMax - yMin);
+    ctx.fillText('y', centerX - 8, padding - 10);
+
+    // Деления и метки
+    ctx.font = '10px monospace';
+    ctx.fillStyle = '#808080';
+
+    for (let i = -gridSteps / 2; i <= gridSteps / 2; i++) {
+      if (i === 0) continue;
       
-      // Фон
-      const text = val.toFixed(2);
-      const metrics = ctx.measureText(text);
-      ctx.fillStyle = colors.textBg;
-      ctx.fillRect(padding - metrics.width - 10, y - 7, metrics.width + 4, 14);
+      const xVal = i * xStep;
+      const yVal = i * yStep;
+      const x = scaleX(xVal);
+      const y = scaleY(yVal);
       
-      ctx.fillStyle = colors.text;
-      ctx.fillText(text, padding - 8, y);
+      // Метки X
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(xVal.toFixed(1), x, centerY + 5);
+      
+      // Черточки X
+      ctx.strokeStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(x, centerY - 3);
+      ctx.lineTo(x, centerY + 3);
+      ctx.stroke();
+      
+      // Метки Y
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#808080';
+      ctx.fillText(yVal.toFixed(1), centerX - 8, y);
+      
+      // Черточки Y
+      ctx.strokeStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(centerX - 3, y);
+      ctx.lineTo(centerX + 3, y);
+      ctx.stroke();
     }
 
-    // Заголовки осей
-    ctx.fillStyle = colors.text;
-    ctx.font = 'bold 14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('X', baseWidth / 2, baseHeight - padding + 35);
-    
-    ctx.save();
-    ctx.translate(padding - 50, baseHeight / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText('Y', 0, 0);
-    ctx.restore();
+    // (0,0)
+    ctx.fillStyle = '#808080';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText('0', centerX - 8, centerY + 5);
 
-    // Нарисовать графики
-    plots.forEach((plot, idx) => {
-      const color = PLOT_COLORS[idx % PLOT_COLORS.length];
+    // Графики
+    plots.forEach((plot, plotIdx) => {
+      const color = PLOT_COLORS[plotIdx % PLOT_COLORS.length];
       
       ctx.strokeStyle = color;
       ctx.lineWidth = 2.5;
@@ -310,8 +221,14 @@ export function GraphCanvas({ plots }: GraphCanvasProps) {
       let first = true;
       plot.points.forEach(([x, y]) => {
         if (!isFinite(x) || !isFinite(y)) return;
+        
         const px = scaleX(x);
         const py = scaleY(y);
+        
+        if (px < padding || px > width - padding || py < padding || py > height - padding) {
+          first = true;
+          return;
+        }
         
         if (first) {
           ctx.moveTo(px, py);
@@ -322,95 +239,75 @@ export function GraphCanvas({ plots }: GraphCanvasProps) {
       });
 
       ctx.stroke();
-      
+
       // Легенда
-      const legendX = baseWidth - padding - 150;
-      const legendY = padding + 20 + idx * 30;
+      const legendX = padding + 15;
+      const legendY = padding + 15 + plotIdx * 25;
       
-      // Фон легенды
-      ctx.fillStyle = colors.textBg;
-      ctx.fillRect(legendX - 5, legendY - 12, 145, 24);
+      ctx.fillStyle = 'rgba(43, 45, 48, 0.85)';
+      ctx.fillRect(legendX - 8, legendY - 10, 140, 20);
       
-      // Линия
       ctx.strokeStyle = color;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(legendX, legendY);
-      ctx.lineTo(legendX + 40, legendY);
+      ctx.lineTo(legendX + 25, legendY);
       ctx.stroke();
       
-      // Название
-      ctx.fillStyle = colors.text;
-      ctx.font = 'bold 13px sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 12px sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(plot.label, legendX + 50, legendY);
+      ctx.fillText(plot.label, legendX + 32, legendY);
     });
+  };
 
-  }, [plots, theme, zoom]);
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
 
-  if (plots.length === 0) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <span>График</span>
-          <div style={styles.headerButtons}>
-            <button onClick={toggleTheme} style={styles.iconButton} title="Переключить тему">
-              {theme === 'dark' ? '☀' : '🌙'}
-            </button>
-          </div>
-        </div>
-        <div style={styles.emptyState}>
-          Запустите программу с функцией график() для отображения
-        </div>
-      </div>
-    );
-  }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resizeCanvas = () => {
+      const rect = container.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      renderGraph(ctx, canvas.width, canvas.height);
+    };
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, [plots]);
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <span>График</span>
+        <span style={styles.title}>График</span>
         <div style={styles.headerButtons}>
-          <button onClick={toggleTheme} style={styles.iconButton} title="Переключить тему">
-            {theme === 'dark' ? '☀' : '🌙'}
-          </button>
-          <div style={styles.divider} />
-          <button onClick={handleZoomOut} style={styles.iconButton} title="Уменьшить (Ctrl/Cmd + -)">
-            -
-          </button>
-          <span style={styles.zoomText}>{Math.round(zoom * 100)}%</span>
-          <button onClick={handleZoomIn} style={styles.iconButton} title="Увеличить (Ctrl/Cmd + +)">
-            +
-          </button>
-          <button onClick={handleZoomReset} style={styles.iconButton} title="Сбросить (Ctrl/Cmd + 0)">
-            ↺
-          </button>
-          <div style={styles.divider} />
-          <button onClick={handleSavePNG} style={styles.saveButton} title="Сохранить график как PNG">
+          <button onClick={handleSavePNG} style={styles.saveBtn} title="Сохранить PNG">
             Сохранить PNG
           </button>
+          {onClose && (
+            <button onClick={onClose} style={styles.closeBtn} title="Скрыть">
+              ✕
+            </button>
+          )}
         </div>
       </div>
-      <div style={styles.canvasContainer} ref={containerRef}>
-        <canvas 
-          ref={canvasRef}
-          style={styles.canvas}
-        />
-      </div>
-      <div style={styles.info}>
-        {plots.map((plot, idx) => (
-          <div key={idx} style={styles.plotInfo}>
-            <span style={{ 
-              ...styles.colorDot, 
-              backgroundColor: PLOT_COLORS[idx % PLOT_COLORS.length]
-            }}></span>
-            <span>{plot.label}: {plot.points.length} точек</span>
+      <div style={styles.canvasArea} ref={containerRef}>
+        {plots.length === 0 ? (
+          <div style={styles.emptyState}>
+            График появится после запуска кода
           </div>
-        ))}
-        <div style={styles.hint}>
-          Используйте Ctrl/Cmd + колесико мыши или Ctrl/Cmd + +/- для масштабирования
-        </div>
+        ) : (
+          <canvas ref={canvasRef} style={styles.canvas} />
+        )}
       </div>
     </div>
   );
@@ -418,114 +315,67 @@ export function GraphCanvas({ plots }: GraphCanvasProps) {
 
 const styles = {
   container: {
+    width: '100%',
     height: '100%',
     display: 'flex',
     flexDirection: 'column' as const,
-    background: '#1e1e1e',
-    overflow: 'hidden',
+    background: '#2b2d30',
   },
   header: {
-    padding: '10px 15px',
-    background: '#2d2d30',
-    borderBottom: '1px solid #3e3e42',
-    color: '#d4d4d4',
-    fontSize: 13,
-    fontWeight: 500,
+    padding: '8px 12px',
+    background: '#313335',
+    borderBottom: '1px solid #2b2d30',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     flexShrink: 0,
   },
+  title: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#afb1b3',
+  },
   headerButtons: {
     display: 'flex',
-    gap: '8px',
-    alignItems: 'center',
+    gap: 6,
   },
-  iconButton: {
-    padding: '4px 8px',
-    background: '#3e3e42',
-    color: '#d4d4d4',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: 14,
+  saveBtn: {
+    padding: '4px 10px',
+    background: '#365880',
+    color: '#ffffff',
+    border: '1px solid #466d94',
+    borderRadius: 3,
+    fontSize: 11,
     cursor: 'pointer',
-    transition: 'background 0.2s',
-    minWidth: '30px',
-    fontWeight: 'bold',
-  } as React.CSSProperties,
-  zoomText: {
-    fontSize: 12,
-    color: '#999',
-    minWidth: '45px',
-    textAlign: 'center' as const,
-  },
-  divider: {
-    width: 1,
-    height: 20,
-    background: '#3e3e42',
-    margin: '0 4px',
-  },
-  saveButton: {
-    padding: '6px 12px',
-    background: '#0e639c',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: 12,
-    cursor: 'pointer',
-    transition: 'background 0.2s',
+    transition: 'all 0.15s',
     fontWeight: 500,
   } as React.CSSProperties,
-  canvasContainer: {
+  closeBtn: {
+    padding: '2px 8px',
+    background: 'transparent',
+    color: '#808080',
+    border: '1px solid transparent',
+    borderRadius: 3,
+    fontSize: 14,
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+  } as React.CSSProperties,
+  canvasArea: {
     flex: 1,
-    overflow: 'auto',
+    overflow: 'hidden',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '20px',
-    background: '#1a1a1a',
   },
   canvas: {
     display: 'block',
-    border: '1px solid #3e3e42',
+    width: '100%',
+    height: '100%',
   },
   emptyState: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#6a6a6a',
-    fontStyle: 'italic' as const,
-    padding: '40px',
-    textAlign: 'center' as const,
-  },
-  info: {
-    padding: '10px 15px',
-    borderTop: '1px solid #3e3e42',
-    display: 'flex',
-    gap: '15px',
-    flexWrap: 'wrap' as const,
-    fontSize: 11,
-    color: '#999',
-    flexShrink: 0,
-    alignItems: 'center',
-  },
-  plotInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    color: '#cccccc',
-  },
-  colorDot: {
-    width: 10,
-    height: 10,
-    borderRadius: '50%',
-    display: 'inline-block',
-  },
-  hint: {
-    marginLeft: 'auto',
-    fontSize: 10,
     color: '#666',
-    fontStyle: 'italic' as const,
+    fontSize: 12,
+    textAlign: 'center' as const,
+    padding: 20,
   },
 };

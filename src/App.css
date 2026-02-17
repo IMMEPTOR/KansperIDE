@@ -6,194 +6,378 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: #2b2d30;
+  color: #cccccc;
   overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
 }
 
-.app {
+input,
+textarea,
+.monaco-editor {
+  user-select: text !important;
+}
+
+/* App Container */
+.app-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
   width: 100vw;
-  background: #1e1e1e;
+  background: #2b2d30;
 }
 
-/* Header */
-.header {
-  background: #2d2d30;
-  padding: 10px 20px;
+/* Top Bar */
+.top-bar {
+  height: 40px;
+  background: #3c3f41;
+  border-bottom: 1px solid #2b2d30;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #3e3e42;
-  height: 50px;
   flex-shrink: 0;
+  padding: 0;
 }
 
-.header-left {
+.logo-area {
+  width: 40px;
+  height: 40px;
+  background: #2b2d30;
   display: flex;
   align-items: center;
-  gap: 20px;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  color: #ffffff;
+  flex-shrink: 0;
+  border-right: 1px solid #2b2d30;
 }
 
-.header h1 {
-  font-size: 20px;
-  color: #e0e0e0;
-  margin: 0;
-}
-
-.file-name {
-  font-size: 14px;
-  color: #cccccc;
-  font-weight: 500;
-}
-
-.toolbar {
+.menu-tabs {
   display: flex;
-  gap: 8px;
+  flex: 1;
+  height: 100%;
+}
+
+.menu-tab {
+  padding: 0 20px;
+  height: 100%;
+  display: flex;
   align-items: center;
-}
-
-.divider {
-  width: 1px;
-  height: 24px;
-  background: #3e3e42;
-  margin: 0 4px;
-}
-
-button {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
   font-size: 13px;
-  transition: all 0.2s;
-  font-weight: 500;
+  color: #afb1b3;
+  cursor: pointer;
+  background: #3c3f41;
+  border-right: 1px solid #2b2d30;
+  transition: all 0.1s;
+  user-select: none;
+}
+
+.menu-tab:hover {
+  background: #4b4d4f;
+  color: #ffffff;
+}
+
+.menu-tab.active {
+  background: #2b2d30;
+  color: #ffffff;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 100%;
+  border-left: 1px solid #2b2d30;
+}
+
+.toolbar-btn {
+  padding: 6px 12px;
+  background: transparent;
+  color: #afb1b3;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
   white-space: nowrap;
 }
 
-.btn-primary {
-  background: #0e639c;
-  color: white;
+.toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #545658;
+  color: #ffffff;
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: #1177bb;
+.toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: #2b2d30;
+  margin: 0 4px;
 }
 
-.btn-primary:disabled {
+.run-btn {
+  padding: 6px 16px;
+  background: #365880;
+  color: #ffffff;
+  border: 1px solid #466d94;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.run-btn:hover:not(:disabled) {
+  background: #466d94;
+  border-color: #5a7fa8;
+}
+
+.run-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.btn-secondary {
-  background: #3e3e42;
-  color: #d4d4d4;
-}
-
-.btn-secondary:hover {
-  background: #505053;
-}
-
-/* Main Container */
-.main-container {
+/* Content Area */
+.content-area {
   flex: 1;
   display: flex;
-  flex-direction: column;
   overflow: hidden;
-  position: relative;
-  min-height: 0; /* ВАЖНО для flex */
+  min-height: 0;
 }
 
-/* Top Section - Editor LEFT, Graph RIGHT */
-.top-section {
+/* Left Sidebar */
+.sidebar-left {
+  width: 240px;
+  background: #3c3f41;
+  border-right: 1px solid #2b2d30;
   display: flex;
-  flex-direction: row;
-  overflow: hidden;
-  position: relative;
-  flex-shrink: 0; /* ВАЖНО - не сжиматься */
-  min-height: 200px; /* ВАЖНО - минимальная высота */
-}
-
-/* Bottom Section - Console FULL WIDTH */
-.bottom-section {
-  overflow: hidden;
-  flex-shrink: 0; /* ВАЖНО - не сжиматься */
-  min-height: 150px; /* ВАЖНО - минимальная высота */
-  max-height: 500px;
-  display: flex; /* ВАЖНО */
-  flex-direction: column; /* ВАЖНО */
-}
-
-/* Resize Handles */
-.resize-handle {
-  background: #3e3e42;
-  transition: background 0.2s;
-  z-index: 100;
+  flex-direction: column;
   flex-shrink: 0;
-  position: relative;
 }
 
-.resize-handle:hover {
-  background: #0e639c;
+.sidebar-title {
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #afb1b3;
+  background: #313335;
+  border-bottom: 1px solid #2b2d30;
 }
 
-.resize-handle:active {
-  background: #1177bb;
+.file-tree-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
 }
 
-.resize-handle-vertical {
-  width: 4px;
-  cursor: col-resize;
-  min-width: 4px;
-  max-width: 4px;
+.tree-loading {
+  padding: 20px;
+  text-align: center;
+  color: #888;
+  font-size: 12px;
 }
 
-.resize-handle-horizontal {
-  height: 4px;
-  cursor: row-resize;
-  min-height: 4px;
-  max-height: 4px;
-  width: 100%;
-}
-
-/* Editor Panel */
-.editor-panel {
+/* File Tree Items */
+.tree-folder,
+.tree-file {
+  padding: 5px 8px;
   display: flex;
-  flex-direction: column;
-  background: #1e1e1e;
-  overflow: hidden;
-  min-width: 300px;
-  position: relative;
-}
-
-.panel-header {
-  padding: 10px 15px;
-  background: #2d2d30;
-  border-bottom: 1px solid #3e3e42;
-  color: #d4d4d4;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
   font-size: 13px;
-  font-weight: 500;
-  flex-shrink: 0;
-  height: 40px;
+  color: #cccccc;
+  transition: background 0.1s;
+  user-select: none;
 }
 
-.editor-content {
+.tree-folder:hover,
+.tree-file:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tree-folder .arrow {
+  transition: transform 0.15s;
+  color: #888;
+  flex-shrink: 0;
+}
+
+.tree-folder .arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.tree-item-name {
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Main Panel */
+.main-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #2b2d30;
+  min-width: 0;
+}
+
+/* File Tabs Bar */
+.file-tabs-bar {
+  display: flex;
+  background: #3c3f41;
+  border-bottom: 1px solid #2b2d30;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
+  height: 32px;
+}
+
+.file-tabs-bar::-webkit-scrollbar {
+  height: 0;
+}
+
+.file-tab {
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #3c3f41;
+  border-right: 1px solid #2b2d30;
+  cursor: pointer;
+  font-size: 12px;
+  color: #afb1b3;
+  white-space: nowrap;
+  transition: all 0.1s;
+  height: 100%;
+  user-select: none;
+  min-width: 120px;
+}
+
+.file-tab:hover {
+  background: #4b4d4f;
+}
+
+.file-tab.active {
+  background: #2b2d30;
+  color: #ffffff;
+}
+
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modified-indicator {
+  color: #6897bb;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.tab-close {
+  background: none;
+  border: none;
+  color: #808080;
+  cursor: pointer;
+  padding: 2px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  font-size: 12px;
+  transition: all 0.1s;
+}
+
+.tab-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* Editor and Graph Row */
+.editor-graph-row {
+  display: flex;
   overflow: hidden;
   position: relative;
   min-height: 0;
 }
 
-/* Graph Panel */
-.graph-panel {
-  display: flex;
-  flex-direction: column;
-  background: #1e1e1e;
+.editor-container {
+  overflow: hidden;
+  background: #2b2d30;
+  min-width: 0;
+}
+
+.graph-container {
+  background: #2b2d30;
+  border-left: 1px solid #3c3f41;
   overflow: hidden;
   min-width: 300px;
-  position: relative;
+}
+
+/* Resize Handles */
+.resize-handle-vert {
+  width: 4px;
+  background: #2b2d30;
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.resize-handle-vert:hover {
+  background: #4A90E2;
+}
+
+.resize-handle-horiz {
+  height: 4px;
+  background: #2b2d30;
+  cursor: row-resize;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.resize-handle-horiz:hover {
+  background: #4A90E2;
+}
+
+/* Console Container */
+.console-container {
+  overflow: hidden;
+  background: #2b2d30;
+  min-height: 100px;
+  max-height: 50vh;
+}
+
+/* Show Graph FAB */
+.show-graph-fab {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  padding: 12px 20px;
+  background: #365880;
+  color: white;
+  border: 1px solid #466d94;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.show-graph-fab:hover {
+  background: #466d94;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
 }
 
 /* Scrollbar */
@@ -203,33 +387,217 @@ button {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1e1e1e;
+  background: #2b2d30;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #424242;
+  background: #555555;
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4e4e4e;
+  background: #666666;
 }
 
-/* Debugging - раскомментируйте чтобы увидеть границы */
-/*
-.top-section {
-  border: 2px solid red;
+::-webkit-scrollbar-corner {
+  background: #2b2d30;
 }
 
-.bottom-section {
-  border: 2px solid blue;
+/* Project controls */
+.sidebar-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.editor-panel {
-  border: 2px solid green;
+.close-project-btn {
+  background: transparent;
+  border: none;
+  color: #808080;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 14px;
+  transition: all 0.1s;
+  line-height: 1;
 }
 
-.graph-panel {
-  border: 2px solid yellow;
+.close-project-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
-*/
+
+.tree-empty {
+  padding: 30px 20px;
+  text-align: center;
+  color: #888;
+}
+
+.tree-empty p {
+  font-size: 12px;
+  margin-bottom: 15px;
+}
+
+.open-folder-hint {
+  padding: 8px 16px;
+  background: #365880;
+  color: #ffffff;
+  border: 1px solid #466d94;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.open-folder-hint:hover {
+  background: #466d94;
+}
+
+/* Menu Bar */
+.menu-bar {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 4px;
+  padding: 0 8px;
+}
+
+.menu-item {
+  position: relative;
+}
+
+.menu-label {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #afb1b3;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.1s;
+  user-select: none;
+}
+
+.menu-label:hover,
+.menu-label.active {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 220px;
+  background: #3c3f41;
+  border: 1px solid #2b2d30;
+  border-radius: 3px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  padding: 4px 0;
+  z-index: 1000;
+  margin-top: 2px;
+}
+
+.menu-option {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #cccccc;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 32px;
+  transition: background 0.1s;
+  user-select: none;
+}
+
+.menu-option:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.menu-option.disabled {
+  color: #666;
+  cursor: not-allowed;
+}
+
+.menu-shortcut {
+  font-size: 11px;
+  color: #888;
+  font-family: monospace;
+}
+
+.menu-separator {
+  height: 1px;
+  background: #2b2d30;
+  margin: 4px 0;
+}
+
+/* Drag and drop styles */
+.file-tab.dragging {
+  opacity: 0.5;
+}
+
+.tree-file:hover {
+  cursor: grab;
+}
+
+.tree-file:active {
+  cursor: grabbing;
+}
+
+.tree-folder.drop-target {
+  background: rgba(74, 144, 226, 0.2) !important;
+  border-left: 3px solid #4A90E2;
+}
+
+/* Word document preview styles */
+.word-content h1,
+.word-content h2,
+.word-content h3,
+.word-content h4,
+.word-content h5,
+.word-content h6 {
+  color: #ffffff;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.word-content p {
+  margin-bottom: 0.8em;
+}
+
+.word-content strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.word-content em {
+  font-style: italic;
+}
+
+.word-content ul,
+.word-content ol {
+  margin-left: 1.5em;
+  margin-bottom: 0.8em;
+}
+
+.word-content li {
+  margin-bottom: 0.3em;
+}
+
+.word-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+
+.word-content td,
+.word-content th {
+  border: 1px solid #3c3f41;
+  padding: 8px;
+  text-align: left;
+}
+
+.word-content th {
+  background: #3c3f41;
+  font-weight: 600;
+}
